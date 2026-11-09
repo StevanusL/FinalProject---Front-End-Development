@@ -1,0 +1,213 @@
+{
+  "settings": {
+    "officeName": "Loket Paket UNKLAB",
+    "location": "Gedung Rektorat, lantai 1 (sebelah Bagian Umum)",
+    "hours": "Senin–Kamis 08.00–16.00, Jumat 08.00–12.00. Sabtu tutup.",
+    "reminderDays": 3,
+    "contact": "0812-0000-0000 (WhatsApp loket)"
+  },
+  "users": [
+    {
+      "id": "u-admin",
+      "name": "Petugas Loket Paket",
+      "email": "admin@unklab.ac.id",
+      "password": "admin123",
+      "role": "admin",
+      "category": "Staf",
+      "idNumber": "ADM001",
+      "phone": "081200000001",
+      "unit": "Bagian Umum",
+      "createdAt": "2026-08-01T08:00:00.000Z"
+    },
+    {
+      "id": "u-grace",
+      "name": "Grace Tumbelaka",
+      "email": "grace@student.unklab.ac.id",
+      "password": "user123",
+      "role": "user",
+      "category": "Mahasiswa",
+      "idNumber": "105022310001",
+      "phone": "081340001111",
+      "unit": "Asrama Putri Genesis",
+      "createdAt": "2026-08-10T08:00:00.000Z"
+    },
+    {
+      "id": "u-kevin",
+      "name": "Kevin Rumengan",
+      "email": "kevin@student.unklab.ac.id",
+      "password": "user123",
+      "role": "user",
+      "category": "Mahasiswa",
+      "idNumber": "105022310002",
+      "phone": "082190002222",
+      "unit": "Asrama Putra Eden",
+      "createdAt": "2026-08-10T08:00:00.000Z"
+    },
+    {
+      "id": "u-natalia",
+      "name": "Natalia Pangemanan",
+      "email": "natalia@student.unklab.ac.id",
+      "password": "user123",
+      "role": "user",
+      "category": "Mahasiswa",
+      "idNumber": "105022310003",
+      "phone": "085256003333",
+      "unit": "Luar asrama",
+      "createdAt": "2026-08-12T08:00:00.000Z"
+    },
+    {
+      "id": "u-ronald",
+      "name": "Ronald Wenas",
+      "email": "ronald.wenas@unklab.ac.id",
+      "password": "user123",
+      "role": "user",
+      "category": "Dosen",
+      "idNumber": "NIDN0911001",
+      "phone": "081144004444",
+      "unit": "Fakultas Ilmu Komputer",
+      "createdAt": "2026-08-01T08:00:00.000Z"
+    }
+  ],
+  "packages": [
+    {
+      "id": "pkg-1001",
+      "trackingNumber": "JP1234567890",
+      "courier": "J&T Express",
+      "recipientName": "Grace Tumbelaka",
+      "recipientPhone": "081340001111",
+      "senderName": "Toko Buku Sinar",
+      "itemDescription": "Buku",
+      "userId": "u-grace",
+      "status": "waiting",
+      "shelf": "A-02",
+      "pickupCode": "K7RD3M",
+      "receivedAt": "2026-11-02T02:15:00.000Z",
+      "receivedBy": "u-admin",
+      "aiExtracted": true,
+      "matchReason": "Nomor HP sama dengan profil",
+      "notes": "",
+      "labelPhoto": "",
+      "pickedUpAt": null,
+      "pickedUpBy": null,
+      "handedOverBy": null,
+      "remindedAt": null
+    },
+    {
+      "id": "pkg-1002",
+      "trackingNumber": "SPXID04812345678",
+      "courier": "SPX Express",
+      "recipientName": "Kevin R.",
+      "recipientPhone": "",
+      "senderName": "Shopee - Gadget Corner",
+      "itemDescription": "Aksesoris HP",
+      "userId": "u-kevin",
+      "status": "waiting",
+      "shelf": "B-05",
+      "pickupCode": "T4HWQ9",
+      "receivedAt": "2026-10-27T06:40:00.000Z",
+      "receivedBy": "u-admin",
+      "aiExtracted": true,
+      "matchReason": "Nomor resi terdaftar di daftar paket ditunggu",
+      "notes": "Kotak kecil",
+      "labelPhoto": "",
+      "pickedUpAt": null,
+      "pickedUpBy": null,
+      "handedOverBy": null,
+      "remindedAt": null
+    },
+    {
+      "id": "pkg-1003",
+      "trackingNumber": "002345678901",
+      "courier": "JNE",
+      "recipientName": "Bpk. Ronald Wenas (FIK)",
+      "recipientPhone": "081144004444",
+      "senderName": "Penerbit Andi",
+      "itemDescription": "Dokumen",
+      "userId": "u-ronald",
+      "status": "picked_up",
+      "shelf": "A-01",
+      "pickupCode": "PX6CLA",
+      "receivedAt": "2026-10-28T01:10:00.000Z",
+      "receivedBy": "u-admin",
+      "aiExtracted": false,
+      "matchReason": "Dipilih manual oleh petugas",
+      "notes": "",
+      "labelPhoto": "",
+      "pickedUpAt": "2026-10-29T03:20:00.000Z",
+      "pickedUpBy": "Ronald Wenas (pemilik)",
+      "handedOverBy": "u-admin",
+      "remindedAt": null
+    },
+    {
+      "id": "pkg-1004",
+      "trackingNumber": "LEX1122334455",
+      "courier": "Lion Parcel",
+      "recipientName": "Nathan",
+      "recipientPhone": "0896xxxx1234",
+      "senderName": "",
+      "itemDescription": "Pakaian",
+      "userId": null,
+      "status": "waiting",
+      "shelf": "C-01",
+      "pickupCode": "M3UEYF",
+      "receivedAt": "2026-11-01T07:05:00.000Z",
+      "receivedBy": "u-admin",
+      "aiExtracted": true,
+      "matchReason": "",
+      "notes": "Nama di label tidak cocok dengan pengguna mana pun",
+      "labelPhoto": "",
+      "pickedUpAt": null,
+      "pickedUpBy": null,
+      "handedOverBy": null,
+      "remindedAt": null
+    }
+  ],
+  "expected": [
+    {
+      "id": "exp-2001",
+      "userId": "u-kevin",
+      "trackingNumber": "SPXID04812345678",
+      "courier": "SPX Express",
+      "description": "Charger dan casing HP",
+      "status": "arrived",
+      "packageId": "pkg-1002",
+      "createdAt": "2026-10-24T10:00:00.000Z"
+    },
+    {
+      "id": "exp-2002",
+      "userId": "u-natalia",
+      "trackingNumber": "TKP0099887766",
+      "courier": "Tokopedia Kurir Rekomendasi",
+      "description": "Botol minum",
+      "status": "waiting",
+      "packageId": null,
+      "createdAt": "2026-11-02T12:00:00.000Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "ntf-3001",
+      "userId": "u-grace",
+      "packageId": "pkg-1001",
+      "message": "Paket J&T Express (JP1234567890) sudah tiba di Loket Paket UNKLAB, rak A-02. Tunjukkan kode K7RD3M saat mengambil.",
+      "read": false,
+      "createdAt": "2026-11-02T02:15:00.000Z"
+    },
+    {
+      "id": "ntf-3002",
+      "userId": "u-kevin",
+      "packageId": "pkg-1002",
+      "message": "Paket SPX Express (SPXID04812345678) sudah tiba di Loket Paket UNKLAB, rak B-05. Tunjukkan kode T4HWQ9 saat mengambil.",
+      "read": true,
+      "createdAt": "2026-10-27T06:40:00.000Z"
+    },
+    {
+      "id": "ntf-3003",
+      "userId": "u-ronald",
+      "packageId": "pkg-1003",
+      "message": "Paket JNE (002345678901) sudah diambil oleh Ronald Wenas (pemilik).",
+      "read": true,
+      "createdAt": "2026-10-29T03:20:00.000Z"
+    }
+  ]
+}
