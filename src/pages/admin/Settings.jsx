@@ -2,15 +2,31 @@ import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import { aiEnabled, aiModel } from '../../api/gemini';
+import { getMailStatus, sendTestEmail } from '../../api/mail';
 
 export default function Settings() {
   const { settings, refreshSettings } = useAuth();
   const [form, setForm] = useState(null);
   const [msg, setMsg] = useState('');
 
+  const [mail, setMail] = useState(null);
+  const [mailMsg, setMailMsg] = useState(null);
+  const [testing, setTesting] = useState(false);
+
   useEffect(() => {
     if (settings) setForm(settings);
   }, [settings]);
+
+  useEffect(() => {
+    getMailStatus().then(setMail);
+  }, []);
+
+  const testEmail = async () => {
+    setTesting(true);
+    const r = await sendTestEmail();
+    setTesting(false);
+    setMailMsg(r.ok ? { ok: true, text: `Email uji terkirim ke ${r.to}. Cek kotak masuk Gmail.` } : { ok: false, text: r.error });
+  };
 
   if (!form) return <div className="page"><p className="muted">Memuat pengaturan…</p></div>;
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
@@ -72,6 +88,28 @@ export default function Settings() {
             ? `Aktif dengan model ${aiModel}. Pembaca label dan Asisten PaketKu memakai Gemini.`
             : 'Belum aktif. Isi VITE_GEMINI_API_KEY di file .env lalu jalankan ulang npm run dev.'}
         </p>
+      </section>
+
+      <section className="card">
+        <h2 className="section-title">Email pemberitahuan (Gmail)</h2>
+        <p>
+          {!mail
+            ? 'Memeriksa server email…'
+            : !mail.ok
+              ? mail.error
+              : mail.configured
+                ? `Aktif. Email "paket sudah tiba" dikirim dari ${mail.from} ke email pemilik paket.`
+                : 'Belum aktif. Isi GMAIL_USER dan GMAIL_APP_PASSWORD di file .env lalu jalankan ulang npm run dev.'}
+        </p>
+        {mail?.configured && (
+          <div className="actions">
+            <button type="button" className="btn btn-secondary" onClick={testEmail} disabled={testing}>
+              {testing ? 'Mengirim…' : 'Kirim email uji'}
+            </button>
+            <span className="muted">Email uji dikirim ke akun Gmail pengirim sendiri.</span>
+          </div>
+        )}
+        {mailMsg && <p className={`alert ${mailMsg.ok ? 'alert-ok' : 'alert-error'}`}>{mailMsg.text}</p>}
       </section>
     </div>
   );

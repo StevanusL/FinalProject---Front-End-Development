@@ -3,15 +3,17 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
-  "description": "Sistem penerimaan dan pengambilan paket kurir di lingkungan UNKLAB, dengan AI pembaca label (Gemini).",
+  "description": "Sistem penerimaan dan pengambilan paket kurir di lingkungan UNKLAB, dengan AI pembaca label (Gemini) dan notifikasi email Gmail.",
   "scripts": {
-    "dev": "concurrently -n api,web -c blue,green \"npm:server\" \"npm:client\"",
+    "dev": "concurrently -n api,mail,web -c blue,magenta,green \"npm:server\" \"npm:mail\" \"npm:client\"",
     "client": "vite",
     "server": "json-server --watch db.json --port 3001",
+    "mail": "node server/mail-server.js",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "nodemailer": "^7.0.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router-dom": "^7.6.0"

@@ -1,5 +1,6 @@
 import { api } from './client';
 import { makeId, makePickupCode } from '../utils/ids';
+import { sendArrivalEmail } from './mail';
 
 const nowIso = () => new Date().toISOString();
 
@@ -21,7 +22,23 @@ export async function notify(userId, packageId, message) {
   });
 }
 
-/** Petugas mencatat paket baru yang diantar kurir. */
+/** Notifikasi bersama untuk semua petugas/admin. */
+export async function notifyAdmins(message, extra = {}) {
+  return api.create('notifications', {
+    id: makeId('ntf'),
+    audience: 'admin',
+    userId: null,
+    message,
+    read: false,
+    createdAt: nowIso(),
+    ...extra,
+  });
+}
+
+/**
+ * Petugas mencatat paket baru yang diantar kurir.
+ * @returns {{ pkg, email }} email = hasil pengiriman email ke pemilik (null jika belum ada pemilik)
+ */
 export async function receivePackage({ data, userId, expectedId, matchReason, aiExtracted, labelPhoto, adminId, settings }) {
   const existing = await api.list('packages');
   const pkg = {
@@ -51,7 +68,8 @@ export async function receivePackage({ data, userId, expectedId, matchReason, ai
 
   if (userId) await notify(userId, saved.id, arrivalMessage(saved, settings));
   if (expectedId) await api.update('expected', expectedId, { status: 'arrived', packageId: saved.id });
-  return saved;
+  const email = userId ? await sendArrivalEmail(saved.id) : null;
+  return { pkg: saved, email };
 }
 
 /** Menetapkan pemilik untuk paket yang sebelumnya belum cocok dengan pengguna mana pun. */
@@ -68,7 +86,8 @@ export async function assignOwner(pkg, user, settings) {
     (e) => e.status === 'waiting' && e.trackingNumber && e.trackingNumber.toUpperCase() === (pkg.trackingNumber || '').toUpperCase(),
   );
   if (hit) await api.update('expected', hit.id, { status: 'arrived', packageId: pkg.id });
-  return updated;
+  const email = await sendArrivalEmail(pkg.id);
+  return { pkg: updated, email };
 }
 
 /** Serah terima paket ke pemilik / perwakilannya. */

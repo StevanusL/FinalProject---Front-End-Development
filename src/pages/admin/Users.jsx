@@ -81,7 +81,7 @@ export default function Users() {
   };
 
   const remove = async (u) => {
-    if (waitingCount(u.id) > 0) return setMsg(`${u.name} masih punya paket di rak. Serahkan paketnya dulu.`);
+    if (waitingCount(u.id) > 0) return setMsg(`${u.name} masih punya paket yang belum diambil. Serahkan paketnya dulu.`);
     if (!window.confirm(`Hapus akun ${u.name}?`)) return;
     await api.remove('users', u.id);
     setMsg(`${u.name} dihapus.`);
@@ -174,7 +174,7 @@ export default function Users() {
               <th>Nama</th>
               <th>NIM / NIP</th>
               <th>Unit</th>
-              <th>Paket di rak</th>
+              <th>Paket menunggu</th>
               <th aria-label="Aksi" />
             </tr>
           </thead>

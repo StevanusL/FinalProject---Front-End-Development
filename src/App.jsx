@@ -1,11 +1,14 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
 import Register from './pages/Register';
+import Landing from './pages/Landing';
+import { getNext } from './utils/nav';
 import UserHome from './pages/user/UserHome';
 import Expected from './pages/user/Expected';
 import Notifications from './pages/user/Notifications';
+import ArrivedBoard from './pages/user/ArrivedBoard';
 import Profile from './pages/user/Profile';
 import AdminHome from './pages/admin/AdminHome';
 import ReceivePackage from './pages/admin/ReceivePackage';
@@ -21,9 +24,22 @@ function RequireRole({ role, children }) {
   return children;
 }
 
+// "/" adalah landing page untuk tamu, dan halaman Paket saya untuk user yang sudah masuk.
+function UserArea() {
+  const { user } = useAuth();
+  const { pathname } = useLocation();
+  // Tamu yang membuka halaman user diarahkan ke Masuk, lalu dikembalikan ke halaman itu setelah masuk
+  if (!user) {
+    return pathname === '/' ? <Landing /> : <Navigate to={`/masuk?next=${encodeURIComponent(pathname)}`} replace />;
+  }
+  if (user.role === 'admin') return <Navigate to="/admin" replace />;
+  return <Layout variant="user" />;
+}
+
 function GuestOnly({ children }) {
   const { user } = useAuth();
-  if (user) return <Navigate to={user.role === 'admin' ? '/admin' : '/'} replace />;
+  const { search } = useLocation();
+  if (user) return <Navigate to={user.role === 'admin' ? '/admin' : getNext(search) || '/'} replace />;
   return children;
 }
 
@@ -33,15 +49,9 @@ export default function App() {
       <Route path="/masuk" element={<GuestOnly><Login /></GuestOnly>} />
       <Route path="/daftar" element={<GuestOnly><Register /></GuestOnly>} />
 
-      <Route
-        path="/"
-        element={
-          <RequireRole role="user">
-            <Layout variant="user" />
-          </RequireRole>
-        }
-      >
+      <Route path="/" element={<UserArea />}>
         <Route index element={<UserHome />} />
+        <Route path="tiba" element={<ArrivedBoard />} />
         <Route path="ditunggu" element={<Expected />} />
         <Route path="notifikasi" element={<Notifications />} />
         <Route path="profil" element={<Profile />} />
@@ -59,6 +69,7 @@ export default function App() {
         <Route path="terima" element={<ReceivePackage />} />
         <Route path="paket" element={<PackageList />} />
         <Route path="paket/:id" element={<PackageDetail />} />
+        <Route path="notifikasi" element={<Notifications audience="admin" />} />
         <Route path="pengguna" element={<Users />} />
         <Route path="pengaturan" element={<Settings />} />
         <Route path="profil" element={<Profile />} />

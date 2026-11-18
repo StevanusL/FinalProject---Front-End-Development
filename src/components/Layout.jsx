@@ -1,13 +1,19 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../api/client';
 import Icon from './Icon';
 import ChatWidget from './ChatWidget';
 
+const NOTIF_PATH = { user: '/notifikasi', admin: '/admin/notifikasi' };
+
+// User melihat notifikasi miliknya; admin melihat notifikasi bersama untuk petugas (audience: 'admin').
+const notifQuery = (variant, user) => (variant === 'admin' ? { audience: 'admin' } : { userId: user.id });
+
 const NAV = {
   user: [
     { to: '/', label: 'Paket saya', short: 'Paket', icon: 'box', end: true },
+    { to: '/tiba', label: 'Paket di loket', short: 'Di loket', icon: 'list' },
     { to: '/ditunggu', label: 'Paket ditunggu', short: 'Ditunggu', icon: 'clock' },
     { to: '/notifikasi', label: 'Notifikasi', short: 'Notifikasi', icon: 'bell', badge: 'unread' },
     { to: '/profil', label: 'Profil', short: 'Profil', icon: 'user' },
@@ -16,6 +22,7 @@ const NAV = {
     { to: '/admin', label: 'Loket', short: 'Loket', icon: 'home', end: true },
     { to: '/admin/terima', label: 'Terima paket', short: 'Terima', icon: 'scan' },
     { to: '/admin/paket', label: 'Daftar paket', short: 'Paket', icon: 'list' },
+    { to: '/admin/notifikasi', label: 'Notifikasi', short: 'Notif', icon: 'bell', badge: 'unread' },
     { to: '/admin/pengguna', label: 'Pengguna', short: 'Pengguna', icon: 'users' },
     { to: '/admin/pengaturan', label: 'Pengaturan', short: 'Atur', icon: 'settings' },
   ],
@@ -38,15 +45,28 @@ export default function Layout({ variant }) {
   const navigate = useNavigate();
   const location = useLocation();
   const [unread, setUnread] = useState(0);
+  const [toast, setToast] = useState(null);
+  const seenIds = useRef(null);
   const items = NAV[variant];
 
   useEffect(() => {
-    if (variant !== 'user') return undefined;
     let alive = true;
     const load = async () => {
       try {
-        const list = await api.list('notifications', { userId: user.id });
-        if (alive) setUnread(list.filter((n) => !n.read).length);
+        const list = await api.list('notifications', notifQuery(variant, user));
+        if (!alive) return;
+        const unreadList = list.filter((n) => !n.read);
+        setUnread(unreadList.length);
+
+        // Tampilkan pop-up untuk notifikasi belum dibaca yang baru terlihat
+        // (saat pertama masuk, atau saat ada kabar baru ketika aplikasi terbuka).
+        // Tidak muncul jika sedang membuka halaman notifikasi itu sendiri.
+        const fresh = unreadList.filter((n) => !seenIds.current?.has(n.id));
+        if (fresh.length && location.pathname !== NOTIF_PATH[variant]) {
+          const newest = fresh.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0];
+          setToast({ count: fresh.length, message: newest.message });
+        }
+        seenIds.current = new Set(list.map((n) => n.id));
       } catch {
         /* abaikan, coba lagi nanti */
       }
@@ -57,11 +77,18 @@ export default function Layout({ variant }) {
       alive = false;
       clearInterval(t);
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [variant, user.id, location.pathname]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const t = setTimeout(() => setToast(null), 9000);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const handleLogout = () => {
     logout();
-    navigate('/masuk');
+    navigate('/');
   };
 
   return (
@@ -111,7 +138,23 @@ export default function Layout({ variant }) {
         ))}
       </nav>
 
-      <ChatWidget role={variant} />
+      {toast && (
+        <div className="toast" role="status">
+          <Icon name="bell" size={20} />
+          <div className="toast-body">
+            <strong>{toast.count > 1 ? `${toast.count} notifikasi baru` : 'Notifikasi baru'}</strong>
+            <span>{toast.message}</span>
+            <NavLink to={NOTIF_PATH[variant]} onClick={() => setToast(null)}>
+              Lihat notifikasi
+            </NavLink>
+          </div>
+          <button type="button" className="icon-btn" onClick={() => setToast(null)} aria-label="Tutup">
+            <Icon name="close" size={18} />
+          </button>
+        </div>
+      )}
+
+      <ChatWidget role={variant} hasNews={variant === 'user' && unread > 0} />
     </div>
   );
 }

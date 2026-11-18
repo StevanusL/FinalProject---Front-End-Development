@@ -22,6 +22,17 @@ const EMPTY = {
   notes: '',
 };
 
+/** Kolom data label; diberi tanda jika AI tidak menemukan isinya. */
+function LabelField({ label, missing, children }) {
+  return (
+    <label className={`field ${missing ? 'is-missing' : ''}`}>
+      <span>{label}</span>
+      {children}
+      {missing && <small>Tidak terbaca di label. Isi manual jika diketahui.</small>}
+    </label>
+  );
+}
+
 export default function ReceivePackage() {
   const { user, settings } = useAuth();
   const { data } = useLoader(async () => {
@@ -40,6 +51,7 @@ export default function ReceivePackage() {
   const [saved, setSaved] = useState(null);
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const missing = (k) => aiFilled && !String(form[k] || '').trim();
 
   const candidates = useMemo(() => {
     if (!data) return [];
@@ -115,7 +127,7 @@ export default function ReceivePackage() {
         : selectedUser
           ? 'Dipilih manual oleh petugas'
           : '';
-      const pkg = await receivePackage({
+      const { pkg, email } = await receivePackage({
         data: form,
         userId: selectedUser?.id || null,
         expectedId: selectedCandidate?.expectedId,
@@ -125,7 +137,7 @@ export default function ReceivePackage() {
         adminId: user.id,
         settings,
       });
-      setSaved({ pkg, owner: selectedUser });
+      setSaved({ pkg, owner: selectedUser, email });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -144,8 +156,19 @@ export default function ReceivePackage() {
               : 'Paket disimpan tanpa pemilik. Tetapkan pemiliknya dari daftar paket saat sudah diketahui.'}
           </p>
         </header>
+        {saved.email?.ok && (
+          <p className="alert alert-ok">
+            <Icon name="check" size={18} /> Email pemberitahuan terkirim ke {saved.email.to}.
+          </p>
+        )}
+        {saved.email && !saved.email.ok && (
+          <p className="alert alert-error">
+            Email tidak terkirim: {saved.email.error} Notifikasi di aplikasi tetap masuk, dan email bisa dikirim ulang
+            dari detail paket.
+          </p>
+        )}
         <PackageLabel pkg={saved.pkg} showCode reminderDays={settings?.reminderDays} />
-        <p className="hint">Tulis kode {saved.pkg.pickupCode} dan rak {saved.pkg.shelf || '-'} pada paket sebelum disimpan di rak.</p>
+        <p className="hint">Tulis kode {saved.pkg.pickupCode} pada paket, lalu taruh di rak {saved.pkg.shelf || '-'}.</p>
         <div className="actions">
           <button type="button" className="btn btn-primary" onClick={reset}>
             <Icon name="camera" size={18} /> Terima paket berikutnya
@@ -217,43 +240,42 @@ export default function ReceivePackage() {
             <span className="step-no">2</span> Periksa data label
           </h2>
           <div className="form">
+            <p className="muted step-note">Semua kolom bisa diisi atau diperbaiki manual oleh petugas.</p>
             <div className="field-row">
-              <label className="field">
-                <span>Nama penerima di label</span>
+              <LabelField label="Nama penerima di label" missing={missing('recipientName')}>
                 <input value={form.recipientName} onChange={set('recipientName')} />
-              </label>
-              <label className="field">
-                <span>No. HP penerima</span>
+              </LabelField>
+              <LabelField label="No. HP penerima" missing={missing('recipientPhone')}>
                 <input value={form.recipientPhone} onChange={set('recipientPhone')} />
-              </label>
+              </LabelField>
             </div>
             <div className="field-row">
-              <label className="field">
-                <span>Nomor resi</span>
+              <LabelField label="Nomor resi" missing={missing('trackingNumber')}>
                 <input
                   value={form.trackingNumber}
                   onChange={(e) => setForm((f) => ({ ...f, trackingNumber: e.target.value.toUpperCase() }))}
                 />
-              </label>
-              <label className="field">
-                <span>Kurir</span>
+              </LabelField>
+              <LabelField label="Kurir" missing={missing('courier')}>
                 <input value={form.courier} onChange={set('courier')} list="courier-list" />
                 <datalist id="courier-list">
                   {COURIERS.map((c) => (
                     <option key={c} value={c} />
                   ))}
                 </datalist>
-              </label>
+              </LabelField>
             </div>
             <div className="field-row">
-              <label className="field">
-                <span>Pengirim / toko</span>
+              <LabelField label="Pengirim / toko" missing={missing('senderName')}>
                 <input value={form.senderName} onChange={set('senderName')} />
-              </label>
-              <label className="field">
-                <span>Isi paket</span>
-                <input value={form.itemDescription} onChange={set('itemDescription')} />
-              </label>
+              </LabelField>
+              <LabelField label="Isi paket" missing={missing('itemDescription')}>
+                <input
+                  value={form.itemDescription}
+                  onChange={set('itemDescription')}
+                  placeholder="Misal: pakaian, buku, dokumen"
+                />
+              </LabelField>
             </div>
           </div>
         </section>
@@ -314,7 +336,12 @@ export default function ReceivePackage() {
             </label>
             <label className="field field-shelf">
               <span>Rak penyimpanan</span>
-              <input value={form.shelf} onChange={set('shelf')} placeholder="A-01" required />
+              <input
+                value={form.shelf}
+                onChange={(e) => setForm((f) => ({ ...f, shelf: e.target.value.toUpperCase() }))}
+                placeholder="A1"
+                required
+              />
             </label>
           </div>
           <label className="field">

@@ -7,7 +7,7 @@ import Icon from './Icon';
 
 const SUGGESTIONS = {
   user: ['Apakah ada paket saya yang sudah datang?', 'Jam berapa loket paket buka?', 'Bisakah teman mengambilkan paket saya?'],
-  admin: ['Paket mana yang sudah lama tidak diambil?', 'Ringkas paket yang masuk hari ini', 'Paket mana yang belum ada pemiliknya?'],
+  admin: ['Paket mana yang sudah lama tidak diambil?', 'Paket apa saja yang akan datang?', 'Paket mana yang belum ada pemiliknya?'],
 };
 
 function slimPackage(p, users, { withCode }) {
@@ -31,7 +31,11 @@ async function buildContext(role, user, settings) {
     ? { loket: settings.officeName, lokasi: settings.location, jamLayanan: settings.hours, kontak: settings.contact }
     : {};
   if (role === 'admin') {
-    const [packages, users] = await Promise.all([api.list('packages'), api.list('users')]);
+    const [packages, users, expected] = await Promise.all([
+      api.list('packages'),
+      api.list('users'),
+      api.list('expected', { status: 'waiting' }),
+    ]);
     const waiting = packages.filter((p) => p.status === 'waiting');
     const today = new Date().toDateString();
     return {
@@ -48,6 +52,14 @@ async function buildContext(role, user, settings) {
         .sort((a, b) => new Date(b.receivedAt) - new Date(a.receivedAt))
         .slice(0, 60)
         .map((p) => slimPackage(p, users, { withCode: false })),
+      paketAkanDatang: expected.map((e) => ({
+        pengguna: users.find((u) => u.id === e.userId)?.name,
+        resi: e.trackingNumber,
+        kurir: e.courier,
+        isi: e.description,
+        perkiraanTiba: e.estimatedDate || 'tidak disebutkan',
+        pesan: e.note || undefined,
+      })),
     };
   }
   const [packages, expected] = await Promise.all([
@@ -83,6 +95,9 @@ function offlineAnswer(role, ctx) {
       late.length
         ? `Lewat ${ctx.batasHariPengingat} hari: ${late.map((p) => `${p.namaDiLabel} (rak ${p.rak})`).join(', ')}.`
         : 'Tidak ada paket yang lewat batas waktu.',
+      ctx.paketAkanDatang.length
+        ? `Akan datang: ${ctx.paketAkanDatang.map((e) => `${e.pengguna} (${e.kurir})`).join(', ')}.`
+        : 'Belum ada kabar paket yang akan datang.',
     ].join('\n');
   }
   const waiting = ctx.paketSaya.filter((p) => p.status === 'menunggu diambil');
@@ -93,7 +108,25 @@ function offlineAnswer(role, ctx) {
   return lines.join('\n');
 }
 
-export default function ChatWidget({ role }) {
+// Sapaan pertama untuk user: langsung memberi tahu paket yang sudah tiba, tanpa perlu bertanya.
+async function buildGreeting(user, settings) {
+  const packages = await api.list('packages', { userId: user.id });
+  const waiting = packages.filter((p) => p.status === 'waiting');
+  const firstName = user.name.split(' ')[0];
+  const where = settings?.officeName || 'loket paket';
+  if (!waiting.length) {
+    return `Halo ${firstName}, belum ada paketmu yang tiba di ${where}. Aku akan kabari lewat notifikasi begitu paketmu datang.`;
+  }
+  return [
+    `Halo ${firstName}, ada ${waiting.length} paketmu yang sudah tiba di ${where}:`,
+    ...waiting.map((p) => `• ${p.courier} ${p.trackingNumber}, tiba ${formatDateTime(p.receivedAt)}. Kode: ${p.pickupCode}`),
+    settings?.hours ? `Jam layanan: ${settings.hours}` : '',
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+export default function ChatWidget({ role, hasNews = false }) {
   const { user, settings } = useAuth();
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState([]);
@@ -104,6 +137,13 @@ export default function ChatWidget({ role }) {
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight });
   }, [messages, busy]);
+
+  useEffect(() => {
+    if (!open || role !== 'user' || messages.length) return;
+    buildGreeting(user, settings)
+      .then((text) => setMessages((m) => (m.length ? m : [{ role: 'model', text, greeting: true }])))
+      .catch(() => {});
+  }, [open, role, user, settings, messages.length]);
 
   const send = async (text) => {
     const q = text.trim();
@@ -116,7 +156,7 @@ export default function ChatWidget({ role }) {
     try {
       ctx = await buildContext(role, user, settings);
       if (!aiEnabled) throw new Error('offline');
-      const reply = await askAssistant({ history: next.filter((m) => !m.note), context: ctx, role });
+      const reply = await askAssistant({ history: next.filter((m) => !m.note && !m.greeting), context: ctx, role });
       setMessages((m) => [...m, { role: 'model', text: reply }]);
     } catch (e) {
       const fallback = ctx ? offlineAnswer(role, ctx) : e.message;
@@ -138,6 +178,7 @@ export default function ChatWidget({ role }) {
       >
         <Icon name={open ? 'close' : 'chat'} size={22} />
         {!open && <span>Tanya</span>}
+        {!open && hasNews && <span className="fab-dot" aria-label="Ada paket baru" />}
       </button>
 
       {open && (
@@ -153,12 +194,18 @@ export default function ChatWidget({ role }) {
           </header>
 
           <div className="chat-list" ref={listRef}>
-            {messages.length === 0 && (
+            {messages.map((m, i) => (
+              <div key={i} className={`bubble bubble-${m.role}`}>
+                {m.text}
+                {m.note && <small className="bubble-note">{m.note}</small>}
+              </div>
+            ))}
+            {messages.every((m) => m.greeting) && (
               <div className="chat-empty">
                 <p>
                   {role === 'admin'
                     ? 'Tanyakan kondisi loket, misalnya paket yang perlu diingatkan.'
-                    : 'Tanyakan status paket Anda, jam loket, atau cara mengambil paket.'}
+                    : 'Atau tanyakan hal lain tentang paketmu.'}
                 </p>
                 <div className="chips">
                   {SUGGESTIONS[role].map((s) => (
@@ -169,12 +216,6 @@ export default function ChatWidget({ role }) {
                 </div>
               </div>
             )}
-            {messages.map((m, i) => (
-              <div key={i} className={`bubble bubble-${m.role}`}>
-                {m.text}
-                {m.note && <small className="bubble-note">{m.note}</small>}
-              </div>
-            ))}
             {busy && <div className="bubble bubble-model bubble-typing">Sedang mencari di data paket…</div>}
           </div>
 

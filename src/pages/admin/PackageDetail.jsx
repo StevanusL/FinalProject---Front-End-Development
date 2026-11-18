@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import { assignOwner, sendReminder } from '../../api/packages';
+import { sendArrivalEmail } from '../../api/mail';
 import { useLoader } from '../../utils/useLoader';
 import { daysSince, formatDateTime, timeAgo } from '../../utils/format';
 import { findRecipientCandidates } from '../../utils/match';
@@ -20,7 +21,9 @@ export default function PackageDetail() {
   }, [id]);
   const [assignId, setAssignId] = useState('');
   const [showHandover, setShowHandover] = useState(false);
-  const [msg, setMsg] = useState('');
+  const [notice, setNotice] = useState(null); // { ok: boolean, text: string }
+  const [emailing, setEmailing] = useState(false);
+  const setMsg = (text, ok = true) => setNotice({ ok, text });
 
   const pkg = data?.pkg;
   const userById = (uid) => data?.users.find((u) => u.id === uid);
@@ -36,8 +39,13 @@ export default function PackageDetail() {
   const doAssign = async (uid) => {
     const u = userById(uid);
     if (!u) return;
-    await assignOwner(pkg, u, settings);
-    setMsg(`Paket ditetapkan untuk ${u.name}. Notifikasi sudah dikirim.`);
+    const { email } = await assignOwner(pkg, u, settings);
+    setMsg(
+      `Paket ditetapkan untuk ${u.name}. Notifikasi aplikasi terkirim. ${
+        email.ok ? `Email terkirim ke ${email.to}.` : `Email tidak terkirim: ${email.error}`
+      }`,
+      email.ok,
+    );
     setAssignId('');
     reload(true);
   };
@@ -45,6 +53,14 @@ export default function PackageDetail() {
   const doRemind = async () => {
     await sendReminder(pkg, settings, daysSince(pkg.receivedAt));
     setMsg('Pengingat dikirim.');
+    reload(true);
+  };
+
+  const doEmail = async () => {
+    setEmailing(true);
+    const email = await sendArrivalEmail(pkg.id);
+    setEmailing(false);
+    setMsg(email.ok ? `Email terkirim ke ${email.to}.` : `Email tidak terkirim: ${email.error}`, email.ok);
     reload(true);
   };
 
@@ -56,6 +72,7 @@ export default function PackageDetail() {
 
   const timeline = [
     { at: pkg.receivedAt, text: `Diterima dari kurir oleh ${userById(pkg.receivedBy)?.name || 'petugas'}${pkg.aiExtracted ? ', label dibaca AI' : ''}` },
+    pkg.emailedAt && { at: pkg.emailedAt, text: `Email pemberitahuan dikirim ke ${pkg.emailedTo}` },
     pkg.remindedAt && { at: pkg.remindedAt, text: 'Pengingat dikirim ke pemilik' },
     pkg.pickedUpAt && { at: pkg.pickedUpAt, text: `Diambil oleh ${pkg.pickedUpBy}, diserahkan ${userById(pkg.handedOverBy)?.name || 'petugas'}` },
   ].filter(Boolean);
@@ -66,9 +83,9 @@ export default function PackageDetail() {
         <Icon name="arrowLeft" size={18} /> Daftar paket
       </Link>
 
-      {msg && (
-        <p className="alert alert-ok">
-          <Icon name="check" size={18} /> {msg}
+      {notice && (
+        <p className={`alert ${notice.ok ? 'alert-ok' : 'alert-error'}`}>
+          {notice.ok && <Icon name="check" size={18} />} {notice.text}
         </p>
       )}
 
@@ -93,7 +110,7 @@ export default function PackageDetail() {
             <h2 className="section-title">Pemilik</h2>
             {owner ? (
               <p>
-                <strong>{owner.name}</strong>, {owner.category} ({owner.idNumber}), {owner.unit || '-'}. HP {owner.phone || '-'}
+                <strong>{owner.name}</strong>, {owner.category} ({owner.idNumber}), {owner.unit || '-'}. HP {owner.phone || '-'}, email {owner.email || '-'}.
                 {pkg.matchReason && <span className="muted"> Dasar pencocokan: {pkg.matchReason}.</span>}
               </p>
             ) : (
@@ -140,9 +157,14 @@ export default function PackageDetail() {
                 <p className="muted">Tetapkan pemilik dulu sebelum paket bisa diserahkan.</p>
               )}
               {pkg.userId && (
-                <button type="button" className="btn btn-secondary btn-block" onClick={doRemind}>
-                  Kirim pengingat
-                </button>
+                <>
+                  <button type="button" className="btn btn-secondary btn-block" onClick={doRemind}>
+                    Kirim pengingat
+                  </button>
+                  <button type="button" className="btn btn-ghost btn-block" onClick={doEmail} disabled={emailing}>
+                    {emailing ? 'Mengirim email…' : pkg.emailedAt ? 'Kirim ulang email' : 'Kirim email pemberitahuan'}
+                  </button>
+                </>
               )}
             </div>
           )}

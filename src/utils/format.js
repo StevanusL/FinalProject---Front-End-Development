@@ -50,3 +50,15 @@ export const COURIERS = [
 ];
 
 export const sortByDateDesc = (key) => (a, b) => new Date(b[key] || 0) - new Date(a[key] || 0);
+
+/** "Grace Tumbelaka" -> "Gr*** Tu***" (untuk daftar paket yang dilihat semua pengguna) */
+export function maskName(name = '') {
+  const words = name.replace(/\(.*?\)/g, ' ').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return 'Tanpa nama';
+  return words
+    .map((w) => (w.length <= 2 ? `${w[0]}*` : `${w.slice(0, 2)}${'*'.repeat(Math.min(3, w.length - 2))}`))
+    .join(' ');
+}
+
+/** "JP1234567890" -> "•••• 7890" */
+export const maskTracking = (t = '') => (t ? `•••• ${t.slice(-4)}` : '-');

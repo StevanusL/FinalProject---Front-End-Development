@@ -4,9 +4,12 @@ import { api } from '../../api/client';
 import { useLoader } from '../../utils/useLoader';
 import { COURIERS, formatDate, sortByDateDesc } from '../../utils/format';
 import { makeId, normalizeTracking } from '../../utils/ids';
+import { notifyAdmins } from '../../api/packages';
 import Icon from '../../components/Icon';
 
-const EMPTY = { trackingNumber: '', courier: COURIERS[0], description: '' };
+const EMPTY = { trackingNumber: '', courier: COURIERS[0], description: '', estimatedDate: '', note: '' };
+
+const todayStr = () => new Date().toISOString().slice(0, 10);
 
 export default function Expected() {
   const { user } = useAuth();
@@ -27,18 +30,31 @@ export default function Expected() {
     }
     setBusy(true);
     try {
-      await api.create('expected', {
+      const exp = await api.create('expected', {
         id: makeId('exp'),
         userId: user.id,
         trackingNumber: tracking,
         courier: form.courier,
         description: form.description.trim(),
+        estimatedDate: form.estimatedDate || null,
+        note: form.note.trim(),
         status: 'waiting',
         packageId: null,
         createdAt: new Date().toISOString(),
       });
+
+      // Heads-up ke petugas: ada paket yang akan datang untuk pengguna ini
+      const parts = [
+        `${user.name} (${user.category}${user.unit ? `, ${user.unit}` : ''}) memberi tahu paket ${form.courier} dengan resi ${tracking} akan datang`,
+      ];
+      if (form.estimatedDate) parts.push(`perkiraan tiba ${formatDate(form.estimatedDate)}`);
+      let message = parts.join(', ') + '.';
+      if (exp.description) message += ` Isi: ${exp.description}.`;
+      if (exp.note) message += ` Pesan: ${exp.note}`;
+      await notifyAdmins(message, { fromUserId: user.id, expectedId: exp.id });
+
       setForm(EMPTY);
-      setMsg('Nomor resi disimpan. Kamu akan dikabari saat paket tiba di loket.');
+      setMsg('Nomor resi disimpan dan petugas loket sudah diberi tahu. Kamu akan dikabari saat paket tiba.');
       reload(true);
     } catch (err) {
       setMsg(err.message);
@@ -47,8 +63,11 @@ export default function Expected() {
     }
   };
 
-  const remove = async (id) => {
-    await api.remove('expected', id);
+  const remove = async (x) => {
+    await api.remove('expected', x.id);
+    await notifyAdmins(`${user.name} membatalkan kabar paket ${x.courier} dengan resi ${x.trackingNumber}.`, {
+      fromUserId: user.id,
+    });
     reload(true);
   };
 
@@ -57,7 +76,8 @@ export default function Expected() {
       <header className="page-head">
         <h1>Paket ditunggu</h1>
         <p className="lede">
-          Nama di label sering disingkat atau salah tulis. Dengan nomor resi, petugas langsung tahu paket itu milikmu.
+          Beri tahu petugas loket bahwa paketmu akan datang. Dengan nomor resi, petugas langsung tahu paket itu
+          milikmu walaupun nama di label disingkat atau salah tulis.
         </p>
       </header>
 
@@ -81,13 +101,28 @@ export default function Expected() {
             </select>
           </label>
         </div>
+        <div className="field-row">
+          <label className="field">
+            <span>Isi paket (opsional)</span>
+            <input value={form.description} onChange={set('description')} placeholder="Buku, sepatu, dokumen…" />
+          </label>
+          <label className="field">
+            <span>Perkiraan tiba (opsional)</span>
+            <input type="date" min={todayStr()} value={form.estimatedDate} onChange={set('estimatedDate')} />
+          </label>
+        </div>
         <label className="field">
-          <span>Isi paket (opsional)</span>
-          <input value={form.description} onChange={set('description')} placeholder="Buku, sepatu, dokumen…" />
+          <span>Pesan untuk petugas (opsional)</span>
+          <input
+            value={form.note}
+            onChange={set('note')}
+            placeholder="Misal: paket besar, mudah pecah, atau akan diambil teman"
+            maxLength={200}
+          />
         </label>
         {msg && <p className="alert">{msg}</p>}
         <button className="btn btn-primary" disabled={busy}>
-          <Icon name="plus" size={18} /> Simpan nomor resi
+          <Icon name="send" size={18} /> Kabari petugas
         </button>
       </form>
 
@@ -106,7 +141,9 @@ export default function Expected() {
                   <span className="muted">
                     {x.courier}
                     {x.description ? `, ${x.description}` : ''}. Didaftarkan {formatDate(x.createdAt)}
+                    {x.estimatedDate ? `, perkiraan tiba ${formatDate(x.estimatedDate)}` : ''}
                   </span>
+                  {x.note && <span className="row-note">Pesan: {x.note}</span>}
                 </div>
                 {x.status === 'arrived' ? (
                   <span className="badge badge-done">Sudah tiba</span>
@@ -116,7 +153,7 @@ export default function Expected() {
                     <button
                       type="button"
                       className="icon-btn"
-                      onClick={() => remove(x.id)}
+                      onClick={() => remove(x)}
                       aria-label={`Hapus resi ${x.trackingNumber}`}
                     >
                       <Icon name="trash" size={18} />

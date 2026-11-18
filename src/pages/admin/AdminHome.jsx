@@ -4,7 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { api } from '../../api/client';
 import { sendReminder } from '../../api/packages';
 import { useLoader } from '../../utils/useLoader';
-import { daysSince, formatDateTime, isOverdue, timeAgo } from '../../utils/format';
+import { daysSince, formatDate, formatDateTime, isOverdue, timeAgo } from '../../utils/format';
 import { normalizeCode } from '../../utils/ids';
 import Handover from '../../components/Handover';
 import Icon from '../../components/Icon';
@@ -13,8 +13,12 @@ export default function AdminHome() {
   const { settings } = useAuth();
   const reminderDays = settings?.reminderDays ?? 3;
   const { data, error, reload } = useLoader(async () => {
-    const [packages, users] = await Promise.all([api.list('packages'), api.list('users')]);
-    return { packages, users };
+    const [packages, users, expected] = await Promise.all([
+      api.list('packages'),
+      api.list('users'),
+      api.list('expected', { status: 'waiting' }),
+    ]);
+    return { packages, users, expected };
   }, []);
   const packages = useMemo(() => data?.packages || [], [data]);
   const users = useMemo(() => data?.users || [], [data]);
@@ -27,6 +31,10 @@ export default function AdminHome() {
   const waiting = packages.filter((p) => p.status === 'waiting');
   const overdue = waiting.filter((p) => p.userId && isOverdue(p, reminderDays));
   const orphan = waiting.filter((p) => !p.userId);
+  // Paket yang sudah dikabarkan pengguna akan datang; yang paling dekat perkiraan tibanya di atas
+  const upcoming = (data?.expected || [])
+    .filter((e) => e.status === 'waiting')
+    .sort((a, b) => (a.estimatedDate || '9999').localeCompare(b.estimatedDate || '9999'));
   const today = new Date().toDateString();
   const todayIn = packages.filter((p) => new Date(p.receivedAt).toDateString() === today).length;
   const todayOut = packages.filter((p) => p.pickedUpAt && new Date(p.pickedUpAt).toDateString() === today).length;
@@ -111,7 +119,7 @@ export default function AdminHome() {
 
       <dl className="tally" aria-label="Ringkasan hari ini">
         <div>
-          <dt>Di rak sekarang</dt>
+          <dt>Menunggu diambil</dt>
           <dd>{waiting.length}</dd>
         </div>
         <div>
@@ -183,6 +191,33 @@ export default function AdminHome() {
         </section>
       </div>
 
+      <section className="section">
+        <div className="section-head">
+          <h2 className="section-title">Akan datang</h2>
+          <span className="muted">Dikabarkan pengguna lewat menu Paket ditunggu</span>
+        </div>
+        {upcoming.length === 0 ? (
+          <p className="muted">Belum ada pengguna yang mengabarkan paket akan datang.</p>
+        ) : (
+          <ul className="rows">
+            {upcoming.map((e) => (
+              <li key={e.id} className="row">
+                <div className="row-main">
+                  <strong>{userById(e.userId)?.name || 'Pengguna'}</strong>
+                  <span className="muted">
+                    {e.courier}, resi <span className="mono-ish">{e.trackingNumber}</span>
+                    {e.description ? `, ${e.description}` : ''}
+                  </span>
+                  {e.note && <span className="row-note">Pesan: {e.note}</span>}
+                </div>
+                <span className="badge badge-wait">
+                  {e.estimatedDate ? `Perkiraan ${formatDate(e.estimatedDate)}` : 'Tanpa perkiraan'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

@@ -8,7 +8,7 @@ import { StatusBadge } from '../../components/PackageLabel';
 import Icon from '../../components/Icon';
 
 const TABS = [
-  { key: 'waiting', label: 'Di rak' },
+  { key: 'waiting', label: 'Menunggu diambil' },
   { key: 'late', label: 'Lewat batas' },
   { key: 'orphan', label: 'Tanpa pemilik' },
   { key: 'picked_up', label: 'Sudah diambil' },
